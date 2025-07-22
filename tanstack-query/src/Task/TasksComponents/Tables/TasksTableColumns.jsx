@@ -63,6 +63,12 @@ const tasksTableColumns = [
   {
     accessorKey: 'title',
     header: 'Task Name',
+    cell: ({ row }) => (
+      <div className="flex items-center">
+        {row.original.title}
+        {row.original.is_new && <span className="ml-2 badge bg-success">New</span>}
+      </div>
+    ),
   },
   {
     accessorKey: 'description',

@@ -28,12 +28,13 @@ export const formatStatus = (status) => {
   }
 };
 
-const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = '' }) => {
+const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = '', onBulkUpdate, onBulkDelete, onTaskViewed }) => {
   const [isEditTaskModalOpen, setIsEditTaskModalOpen] = useState(false);
   const [currentTaskForEdit, setCurrentTaskForEdit] = useState(null);
   const [isViewTaskModalOpen, setIsViewTaskModalOpen] = useState(false);
   const [currentTaskForView, setCurrentTaskForView] = useState(null);
   const [rowSelection, setRowSelection] = useState({});
+  const [completionFilter, setCompletionFilter] = useState('all'); // 'all', 'outstanding', 'completed'
 
   // Add handlers for grid actions
   const handleOpenEditTaskModal = (taskObjectFromRow) => {
@@ -71,8 +72,15 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
     if (statusFilter) {
       filtered = filtered.filter(task => (task.status || '').toLowerCase() === statusFilter.toLowerCase());
     }
+    if (completionFilter !== 'all') {
+      if (completionFilter === 'completed') {
+        filtered = filtered.filter(task => (task.status || '').toLowerCase() === 'done');
+      } else { // outstanding
+        filtered = filtered.filter(task => (task.status || '').toLowerCase() !== 'done');
+      }
+    }
     return filtered;
-  }, [tasks, searchQuery, statusFilter]);
+  }, [tasks, searchQuery, statusFilter, completionFilter]);
 
   // Dummy delete handler for demonstration (replace with your actual logic)
   const handleDeleteTask = (taskId) => {
@@ -100,6 +108,36 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
     },
   });
 
+  const handleBulkDelete = () => {
+    const selectedTaskIds = Object.keys(rowSelection).map(Number);
+    if (selectedTaskIds.length > 0) {
+      onBulkDelete(selectedTaskIds);
+      setRowSelection({});
+    }
+  };
+
+  const handleBulkMarkAsCompleted = () => {
+    const selectedTaskIds = Object.keys(rowSelection).map(Number);
+    const tasksToUpdate = tasks.filter(task => selectedTaskIds.includes(task.id))
+      .map(task => ({ ...task, status: 'Done' }));
+
+    if (tasksToUpdate.length > 0) {
+      onBulkUpdate(tasksToUpdate);
+      setRowSelection({});
+    }
+  };
+  
+  const handleBulkMarkAsOutstanding = () => {
+    const selectedTaskIds = Object.keys(rowSelection).map(Number);
+    const tasksToUpdate = tasks.filter(task => selectedTaskIds.includes(task.id))
+      .map(task => ({ ...task, status: 'In Progress' }));
+
+    if (tasksToUpdate.length > 0) {
+      onBulkUpdate(tasksToUpdate);
+      setRowSelection({});
+    }
+  };
+
   // Add grid pagination and selection state
   const [gridPage, setGridPage] = useState(0);
   const [gridPageSize, setGridPageSize] = useState(10);
@@ -115,14 +153,47 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
         : [...selected, taskId]
     );
   };
+  
+  const handleCompletionFilter = (filter) => {
+    setCompletionFilter(current => (current === filter ? 'all' : filter));
+  };
 
   return (
     <div className="w-full px-2">
       <div className="flex flex-wrap md:flex-nowrap w-full mb-4 gap-2">
         <div className="flex w-full md:w-full">
-          <button className="bg-[#6c757d] text-white px-3 w-full py-1 rounded-l hover:bg-[#5a6268]">Outstanding</button>
-          <button className="bg-[#6c757d] text-white px-3 w-full py-1 rounded-r hover:bg-[#5a6268]">Completed</button>
+          <button 
+            className={`bg-[#6c757d] text-white px-3 w-full py-1 rounded-l hover:bg-[#5a6268] ${completionFilter === 'outstanding' ? 'bg-[#5a6268]' : ''}`}
+            onClick={() => handleCompletionFilter('outstanding')}
+          >
+            Outstanding
+          </button>
+          <button 
+            className={`bg-[#6c757d] text-white px-3 w-full py-1 rounded-r hover:bg-[#5a6268] ${completionFilter === 'completed' ? 'bg-[#5a6268]' : ''}`}
+            onClick={() => handleCompletionFilter('completed')}
+          >
+            Completed
+          </button>
         </div>
+        {Object.keys(rowSelection).length > 0 && (
+          <div className="relative">
+            <select 
+              className="bg-[#5a6268] text-white px-3 py-1 rounded"
+              onChange={(e) => {
+                const action = e.target.value;
+                if (action === 'delete') handleBulkDelete();
+                if (action === 'completed') handleBulkMarkAsCompleted();
+                if (action === 'outstanding') handleBulkMarkAsOutstanding();
+                e.target.value = ''; // Reset select
+              }}
+            >
+              <option value="">Bulk Actions</option>
+              <option value="delete">Delete Selected</option>
+              <option value="completed">Mark as Completed</option>
+              <option value="outstanding">Mark as Outstanding</option>
+            </select>
+          </div>
+        )}
         {/* Removed internal search/filter input for clarity */}
       </div>
 
@@ -180,7 +251,11 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
                         <Trash size={18} />
                       </button>
                     </div>
-                    <div className="mb-1"><span className="font-bold">Task Name: </span>{task.title}</div>
+                    <div className="mb-1">
+                      <span className="font-bold">Task Name: </span>
+                      {task.title}
+                      {task.is_new && <span className="ml-2 badge bg-success">New</span>}
+                    </div>
                     <div className="mb-1"><span className="font-bold">Description: </span>{task.description}</div>
                     <div className="mb-1"><span className="font-bold">Case: </span>{task.case_number}</div>
                     <div className="mb-1"><span className="font-bold">Created On: </span>{formatDate(task.created_at)}</div>
@@ -281,6 +356,7 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
           show={isViewTaskModalOpen}
           onHide={handleCloseViewTaskModal}
           taskData={currentTaskForView}
+          onTaskViewed={onTaskViewed}
         />
       )}
     </div>

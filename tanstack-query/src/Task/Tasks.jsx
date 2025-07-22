@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import TasksTable from './TasksComponents/Tables/TasksTable';
 import NewTaskModal from './TasksComponents/Modals/NewTaskModal';
 import axiosInstance from '../services/httpService';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, List, Grid } from 'lucide-react';
 
 const Tasks = () => {
@@ -12,6 +12,8 @@ const Tasks = () => {
   const [statusFilter, setStatusFilter] = useState(""); // For advanced filtering
   const [modalShow, setModalShow] = useState(false);
   const [layout, setLayout] = useState("table"); // 'table' or 'grid'
+
+  const queryClient = useQueryClient();
 
   const {
     data: tasks = [],
@@ -24,6 +26,37 @@ const Tasks = () => {
       const response = await axiosInstance.get('pms/tasks/');
       if (response.status !== 200) throw new Error('Error fetching tasks');
       return response.data;
+    },
+  });
+
+  const singleTaskUpdateMutation = useMutation({
+    mutationFn: (task) => axiosInstance.put(`/pms/tasks/${task.id}`, task),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tasks']);
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (updatedTasks) => {
+      // This could be a single API call if your backend supports it,
+      // otherwise, it's a series of calls.
+      return Promise.all(updatedTasks.map(task => 
+        axiosInstance.put(`/pms/tasks/${task.id}`, task)
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tasks']);
+    },
+  });
+  
+  const deleteMutation = useMutation({
+    mutationFn: (taskIds) => {
+      return Promise.all(taskIds.map(id => 
+        axiosInstance.delete(`/pms/tasks/${id}`)
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['tasks']);
     },
   });
 
@@ -87,7 +120,15 @@ const Tasks = () => {
         </div>
       </div>
 
-      <TasksTable tasks={tasks} layout={layout} searchQuery={searchQuery} statusFilter={statusFilter} />
+      <TasksTable 
+        tasks={tasks} 
+        layout={layout} 
+        searchQuery={searchQuery} 
+        statusFilter={statusFilter}
+        onBulkUpdate={(updatedTasks) => mutation.mutate(updatedTasks)}
+        onBulkDelete={(taskIds) => deleteMutation.mutate(taskIds)}
+        onTaskViewed={(task) => singleTaskUpdateMutation.mutate(task)}
+      />
       <NewTaskModal show={modalShow} onHide={() => setModalShow(false)} />
     </div>
   );

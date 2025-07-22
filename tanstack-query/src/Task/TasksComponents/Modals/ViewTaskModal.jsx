@@ -1,11 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { CalendarCheck, Clock, AlertTriangle, Send } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import axiosInstance from '../../../services/httpService';
 
-const ViewTaskModal = ({ show, onHide, taskData }) => {
+const ViewTaskModal = ({ show, onHide, taskData, onTaskViewed }) => {
   const [showReminder, setShowReminder] = useState(false);
+  const [hasMarkedViewed, setHasMarkedViewed] = useState(false);
+
+  useEffect(() => {
+    if (taskData && taskData.is_new && !hasMarkedViewed) {
+      onTaskViewed({ ...taskData, is_new: false });
+      setHasMarkedViewed(true);
+    }
+  }, [taskData, onTaskViewed, hasMarkedViewed]);
+
+  useEffect(() => {
+    setHasMarkedViewed(false);
+  }, [taskData?.id]);
 
   const { data: cases = [], isLoading: casesLoading } = useQuery({
     queryKey: ['cases'],
