@@ -4,7 +4,7 @@ import { CalendarCheck, Clock, AlertTriangle, Send } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import axiosInstance from '../../../services/httpService';
 
-const ViewTaskModal = ({ show, onHide, taskData, onTaskViewed }) => {
+const ViewTaskModal = ({ show, onHide, taskData, onTaskViewed, onEdit, onDelete }) => {
   const [showReminder, setShowReminder] = useState(false);
   const [hasMarkedViewed, setHasMarkedViewed] = useState(false);
 
@@ -126,12 +126,29 @@ const ViewTaskModal = ({ show, onHide, taskData, onTaskViewed }) => {
             </div>
           )}
 
-          <div className="flex justify-between mt-6">
+          <div className="flex justify-between mt-6 space-x-2">
             <button
               onClick={onHide}
               className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
             >
               Close
+            </button>
+            <button
+              onClick={() => onEdit && onEdit(taskData)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to delete this task?')) {
+                  onDelete && onDelete(taskData.id);
+                  onHide();
+                }
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Delete
             </button>
             <button
               onClick={handleSendReminder}

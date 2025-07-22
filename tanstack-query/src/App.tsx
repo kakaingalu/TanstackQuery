@@ -1,4 +1,4 @@
-import Tasks from './Task/Tasks.jsx';
+import Tasks from './Task/Tasks.tsx';
 import './App.css';
 
 function App() {

@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
-import columns from './TasksTableColumns.jsx';
-import EditTaskModal from '../Modals/EditTaskModal';
-import ViewTaskModal from '../Modals/ViewTaskModal';
-import { Eye, Pencil, Trash } from 'lucide-react';
+import columns from './TasksTableColumns.tsx';
+import EditTaskModal from '../Modals/EditTaskModal.tsx';
+import ViewTaskModal from '../Modals/ViewTaskModal.tsx';
+// import { Eye, Pencil, Trash } from 'lucide-react';
 
 export const formatDate = (dateStr) => {
   const dateObj = new Date(dateStr);
-  const options = { weekday: 'long', day: 'numeric', month: 'long' };
+  const options = { weekday: 'long' as const, day: 'numeric' as const, month: 'long' as const };
   return dateObj.toLocaleDateString('en-US', options);
 };
 
@@ -33,7 +33,7 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
   const [currentTaskForEdit, setCurrentTaskForEdit] = useState(null);
   const [isViewTaskModalOpen, setIsViewTaskModalOpen] = useState(false);
   const [currentTaskForView, setCurrentTaskForView] = useState(null);
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<Record<number, boolean>>({});
   const [completionFilter, setCompletionFilter] = useState('all'); // 'all', 'outstanding', 'completed'
 
   // Add handlers for grid actions
@@ -141,13 +141,13 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
   // Add grid pagination and selection state
   const [gridPage, setGridPage] = useState(0);
   const [gridPageSize, setGridPageSize] = useState(10);
-  const [selectedGridTasks, setSelectedGridTasks] = useState([]);
+  const [selectedGridTasks, setSelectedGridTasks] = useState<number[]>([]);
   const gridPageCount = Math.ceil(filteredTasks.length / gridPageSize);
   const paginatedTasks = filteredTasks.slice(gridPage * gridPageSize, (gridPage + 1) * gridPageSize);
   const handleGridPrevPage = () => setGridPage(p => Math.max(0, p - 1));
   const handleGridNextPage = () => setGridPage(p => Math.min(gridPageCount - 1, p + 1));
-  const handleGridTaskSelect = (taskId) => {
-    setSelectedGridTasks(selected =>
+  const handleGridTaskSelect = (taskId: number) => {
+    setSelectedGridTasks((selected: number[]) =>
       selected.includes(taskId)
         ? selected.filter(id => id !== taskId)
         : [...selected, taskId]
@@ -179,7 +179,7 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
           <div className="relative">
             <select 
               className="bg-[#5a6268] text-white px-3 py-1 rounded"
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                 const action = e.target.value;
                 if (action === 'delete') handleBulkDelete();
                 if (action === 'completed') handleBulkMarkAsCompleted();
@@ -214,7 +214,15 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
               </thead>
               <tbody>
                 {table.getRowModel().rows.map(row => (
-                  <tr key={row.id} className="hover:bg-gray-50">
+                  <tr
+                    key={row.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+            onClick={(e: React.MouseEvent<HTMLTableRowElement>) => {
+              if ((e.target as HTMLInputElement).type !== 'checkbox') {
+                handleOpenViewTaskModal(row.original);
+              }
+            }}
+                  >
                     {row.getVisibleCells().map(cell => (
                       <td key={cell.id} className="px-4 py-2 border-b">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -229,28 +237,18 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
               {/* Grid Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedTasks.map(task => (
-                  <div className="border rounded p-4 shadow bg-white flex flex-col justify-between" key={task.id}>
+                  <div className="border rounded p-4 shadow bg-white flex flex-col justify-between cursor-pointer" key={task.id} onClick={() => handleOpenViewTaskModal(task)}>
                     <div className="flex items-center mb-2">
                       <input
                         type="checkbox"
                         checked={selectedGridTasks.includes(task.id)}
                         onChange={() => handleGridTaskSelect(task.id)}
                         className="mr-2"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <span className="text-xs text-gray-500">Select</span>
                     </div>
-                    <div className="mb-2">
-                      <span className="font-bold">Actions: </span>
-                      <button className="px-2 py-1 text-gray-600 hover:text-blue-600" title="View" onClick={() => handleOpenViewTaskModal(task)}>
-                        <Eye size={18} />
-                      </button>
-                      <button className="px-2 py-1 text-gray-600 hover:text-green-600" title="Edit" onClick={() => handleOpenEditTaskModal(task)}>
-                        <Pencil size={18} />
-                      </button>
-                      <button className="px-2 py-1 text-gray-600 hover:text-red-600" title="Delete" onClick={() => handleDeleteTask(task.id)}>
-                        <Trash size={18} />
-                      </button>
-                    </div>
+                    {/* Removed Actions buttons */}
                     <div className="mb-1">
                       <span className="font-bold">Task Name: </span>
                       {task.title}
@@ -349,6 +347,8 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
           show={isEditTaskModalOpen}
           onHide={handleCloseEditTaskModal}
           taskData={currentTaskForEdit}
+          onTaskUpdated={() => {}}
+          onTaskDeleted={() => {}}
         />
       )}
       {isViewTaskModalOpen && currentTaskForView && (
@@ -357,6 +357,8 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
           onHide={handleCloseViewTaskModal}
           taskData={currentTaskForView}
           onTaskViewed={onTaskViewed}
+          onEdit={handleOpenEditTaskModal}
+          onDelete={handleDeleteTask}
         />
       )}
     </div>

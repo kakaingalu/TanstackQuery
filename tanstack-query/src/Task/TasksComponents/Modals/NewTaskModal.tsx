@@ -45,21 +45,23 @@ const NewTaskModal = ({ show, onHide }) => {
     queryFn: async () => (await axiosInstance.get('pms/employees/')).data
   });
 
-  const createTaskMutation = useMutation({
-    mutationFn: async (values) => {
+  const { mutate: createTaskMutate, status: createTaskStatus } = useMutation<any, Error, typeof initialValues>({
+    mutationFn: async (values: typeof initialValues) => {
       const response = await axiosInstance.post('pms/tasks/', values);
       if (response.status !== 201) throw new Error(`HTTP error! Status: ${response.status}`);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['tasks']);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       Swal.fire('Good job!', 'You have created a new Task', 'success');
       onHide();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       Swal.fire('Error', error.message, 'error');
     }
   });
+
+  // Removed the separate isLoading assignment because createTaskMutation.isLoading is not recognized
 
   const handleCaseChange = (event, setFieldValue) => {
     const selectedCaseId = event.target.value;
@@ -94,7 +96,7 @@ const NewTaskModal = ({ show, onHide }) => {
             initialValues={initialValues}
             validationSchema={newTaskSchema}
             onSubmit={(values, { resetForm, setSubmitting }) => {
-              createTaskMutation.mutate(values, {
+              createTaskMutate(values, {
                 onSettled: () => setSubmitting(false)
               });
               resetForm();
@@ -188,9 +190,9 @@ const NewTaskModal = ({ show, onHide }) => {
                   <button
                     type="submit"
                     className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    disabled={isSubmitting || createTaskMutation.isLoading}
+                    disabled={isSubmitting || createTaskStatus === 'pending'}
                   >
-                    {createTaskMutation.isLoading ? 'Submitting...' : 'Save'}
+                    {createTaskStatus === 'pending' ? 'Submitting...' : 'Save'}
                   </button>
                 </div>
               </Form>
