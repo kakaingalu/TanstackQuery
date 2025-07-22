@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useReactTable, getCoreRowModel, getPaginationRowModel, flexRender } from '@tanstack/react-table';
 import columns from './TasksTableColumns.tsx';
 import EditTaskModal from '../Modals/EditTaskModal.tsx';
@@ -138,25 +138,60 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
     }
   };
 
+  const handleBulkMarkAsRead = () => {
+    const selectedTaskIds = Object.keys(rowSelection).map(Number);
+    const tasksToUpdate = tasks.filter(task => selectedTaskIds.includes(task.id))
+      .map(task => ({ ...task, is_new: false }));
+
+    if (tasksToUpdate.length > 0) {
+      onBulkUpdate(tasksToUpdate);
+      setRowSelection({});
+    }
+  };
+
+  const handleBulkUnmarkAsRead = () => {
+    const selectedTaskIds = Object.keys(rowSelection).map(Number);
+    const tasksToUpdate = tasks.filter(task => selectedTaskIds.includes(task.id))
+      .map(task => ({ ...task, is_new: true }));
+
+    if (tasksToUpdate.length > 0) {
+      onBulkUpdate(tasksToUpdate);
+      setRowSelection({});
+    }
+  };
+
   // Add grid pagination and selection state
   const [gridPage, setGridPage] = useState(0);
   const [gridPageSize, setGridPageSize] = useState(10);
-  const [selectedGridTasks, setSelectedGridTasks] = useState<number[]>([]);
+  // Removed separate selectedGridTasks state and use rowSelection instead
+  // const [selectedGridTasks, setSelectedGridTasks] = useState<number[]>([]);
   const gridPageCount = Math.ceil(filteredTasks.length / gridPageSize);
   const paginatedTasks = filteredTasks.slice(gridPage * gridPageSize, (gridPage + 1) * gridPageSize);
   const handleGridPrevPage = () => setGridPage(p => Math.max(0, p - 1));
   const handleGridNextPage = () => setGridPage(p => Math.min(gridPageCount - 1, p + 1));
   const handleGridTaskSelect = (taskId: number) => {
-    setSelectedGridTasks((selected: number[]) =>
-      selected.includes(taskId)
-        ? selected.filter(id => id !== taskId)
-        : [...selected, taskId]
-    );
+    setRowSelection((prevSelection) => {
+      const newSelection = { ...prevSelection };
+      if (newSelection[taskId]) {
+        delete newSelection[taskId];
+      } else {
+        newSelection[taskId] = true;
+      }
+      return newSelection;
+    });
   };
   
   const handleCompletionFilter = (filter) => {
     setCompletionFilter(current => (current === filter ? 'all' : filter));
   };
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = paginatedTasks.some(task => rowSelection[task.id]) && !paginatedTasks.every(task => rowSelection[task.id]);
+    }
+  }, [paginatedTasks, rowSelection]);
 
   return (
     <div className="w-full px-2">
@@ -184,6 +219,8 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
                 if (action === 'delete') handleBulkDelete();
                 if (action === 'completed') handleBulkMarkAsCompleted();
                 if (action === 'outstanding') handleBulkMarkAsOutstanding();
+                if (action === 'markAsRead') handleBulkMarkAsRead();
+                if (action === 'unmarkAsRead') handleBulkUnmarkAsRead();
                 e.target.value = ''; // Reset select
               }}
             >
@@ -191,6 +228,8 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
               <option value="delete">Delete Selected</option>
               <option value="completed">Mark as Completed</option>
               <option value="outstanding">Mark as Outstanding</option>
+              <option value="markAsRead">Mark as Read</option>
+              <option value="unmarkAsRead">Unmark as Read</option>
             </select>
           </div>
         )}
@@ -234,6 +273,32 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
             </table>
           ) : (
             <>
+              {/* Grid Select All Checkbox */}
+              <div className="flex items-center mb-2 p-2 bg-gray-100 rounded border border-gray-300 w-max">
+                <input
+                  type="checkbox"
+                  ref={selectAllRef}
+                  checked={paginatedTasks.length > 0 && paginatedTasks.every(task => rowSelection[task.id])}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    if (checked) {
+                      const newSelection = { ...rowSelection };
+                      paginatedTasks.forEach(task => {
+                        newSelection[task.id] = true;
+                      });
+                      setRowSelection(newSelection);
+                    } else {
+                      const newSelection = { ...rowSelection };
+                      paginatedTasks.forEach(task => {
+                        delete newSelection[task.id];
+                      });
+                      setRowSelection(newSelection);
+                    }
+                  }}
+                  className="mr-2"
+                />
+                <span className="text-sm font-semibold text-gray-700">Select All</span>
+              </div>
               {/* Grid Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedTasks.map(task => (
@@ -241,7 +306,7 @@ const TasksTable = ({ tasks, layout = "table", searchQuery = '', statusFilter = 
                     <div className="flex items-center mb-2">
                       <input
                         type="checkbox"
-                        checked={selectedGridTasks.includes(task.id)}
+                        checked={!!rowSelection[task.id]}
                         onChange={() => handleGridTaskSelect(task.id)}
                         className="mr-2"
                         onClick={(e) => e.stopPropagation()}
